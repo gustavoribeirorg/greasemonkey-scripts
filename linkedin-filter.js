@@ -6,31 +6,35 @@
 
 const palavrasChave = ["vaga"];
 
-function filtrarPosts() {
-    // Busca apenas as publicações que ainda não foram analisadas pelo script
-    const posts = document.querySelectorAll('[role="listitem"]:not([data-analisado="true"])');
+function analisarPost(elementoTexto) {
+    // Sobe na estrutura até encontrar o contêiner principal do post completo
+    const postCompleto = elementoTexto.closest('.fie-impression-container') || elementoTexto.closest('article');
+    
+    if (!postCompleto || postCompleto.getAttribute('data-analisado') === 'true') return;
+    postCompleto.setAttribute('data-analisado', 'true');
 
-    posts.forEach(post => {
-        // Marca o post para que ele seja ignorado na próxima execução
-        post.setAttribute('data-analisado', 'true');
+    const texto = elementoTexto.innerText.toLowerCase();
+    const temPalavra = palavrasChave.some(palavra => texto.includes(palavra));
 
-        const caixaDeTexto = post.querySelector('[data-testid="expandable-text-box"]');
-
-        // Se não houver caixa de texto (post apenas com imagem/vídeo), oculta
-        if (!caixaDeTexto) {
-            post.style.display = 'none';
-            return; 
+    // Se não tiver a palavra-chave, oculta a estrutura inteira (post e comentários acoplados)
+    if (!temPalavra) {
+        postCompleto.style.display = 'none';
+        
+        // Remove também elementos irmãos problemáticos que possam ser os comentários soltos
+        if (postCompleto.nextElementSibling && postCompleto.nextElementSibling.classList.contains('feed-shared-update-v2__comments-container')) {
+            postCompleto.nextElementSibling.style.display = 'none';
         }
-
-        const texto = caixaDeTexto.innerText.toLowerCase();
-        const temPalavra = palavrasChave.some(palavra => texto.includes(palavra));
-
-        // Se não encontrar as palavras-chave, oculta a publicação inteira
-        if (!temPalavra) {
-            post.style.display = 'none';
-        }
-    });
+    }
 }
 
-// Executa o filtro continuamente a cada 1 segundo (evita travamentos)
-setInterval(filtrarPosts, 1000);
+// Observador para analisar o texto assim que ele surge na tela
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach(() => {
+        // Foca diretamente nas caixas de texto que você identificou
+        const caixasDeTexto = document.querySelectorAll('.feed-shared-inline-show-more-text');
+        caixasDeTexto.forEach(analisarPost);
+    });
+});
+
+// Inicia a observação do feed
+observer.observe(document.body, { childList: true, subtree: true });
